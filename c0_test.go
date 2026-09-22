@@ -178,6 +178,19 @@ func TestETBPayloadRejectsControlBytes(t *testing.T) {
 	}
 }
 
+func TestRefNamesRejectControlBytes(t *testing.T) {
+	b := &Builder{}
+	b.Ref("bad\x1fname")
+	if b.Err() == nil {
+		t.Error("expected an error for a control byte in a reference name")
+	}
+	b = &Builder{}
+	b.RefPath("users", "01\x1e", "name")
+	if b.Err() == nil {
+		t.Error("expected an error for a control byte in a reference path segment")
+	}
+}
+
 func TestNamesRejectControlBytes(t *testing.T) {
 	b := &Builder{}
 	b.Group("bad\x1fname", nil)

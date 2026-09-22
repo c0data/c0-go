@@ -92,22 +92,24 @@ func (b *Builder) Nested(fn func(*Builder)) *Builder {
 	return b
 }
 
-// Ref writes a reference to a named group (ENQ + name).
+// Ref writes a reference to a named group (ENQ + name). Reference targets
+// are names, so a control byte is recorded via Err like any other name.
 func (b *Builder) Ref(name string) *Builder {
 	b.buf = append(b.buf, ENQ)
-	b.buf = append(b.buf, name...)
+	b.writeName(name)
 	return b
 }
 
 // RefPath writes a path reference (group, record id, optional field): ENQ,
-// STX, the segments separated by US, ETX.
+// STX, the segments separated by US, ETX. Segments are names, so a control
+// byte is recorded via Err.
 func (b *Builder) RefPath(path ...string) *Builder {
 	b.buf = append(b.buf, ENQ, STX)
 	for i, seg := range path {
 		if i > 0 {
 			b.buf = append(b.buf, US)
 		}
-		b.buf = append(b.buf, seg...)
+		b.writeName(seg)
 	}
 	b.buf = append(b.buf, ETX)
 	return b
