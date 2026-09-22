@@ -199,3 +199,59 @@ func TestConformanceStream(t *testing.T) {
 		}
 	}
 }
+
+func TestConformanceList(t *testing.T) {
+	for _, c := range vectors(t, "list.json") {
+		name := c["name"].(string)
+		buf := hexBytes(c["bytes"].(string))
+		record := c["record"].([]any)
+		rec := NewTable(buf).Record(0)
+		if rec.FieldCount() != len(record) {
+			t.Errorf("%s: arity = %d, want %d", name, rec.FieldCount(), len(record))
+		}
+		for i, f := range record {
+			items, isList := f.([]any)
+			if !isList {
+				if !bytes.Equal(rec.Value(i), fieldBytes(f)) {
+					t.Errorf("%s: field %d = %q, want %q", name, i, rec.Value(i), fieldBytes(f))
+				}
+				continue
+			}
+			got := rec.List(i)
+			if len(got) != len(items) {
+				t.Errorf("%s: field %d list len = %d, want %d", name, i, len(got), len(items))
+				continue
+			}
+			for j, item := range items {
+				if !bytes.Equal(got[j], fieldBytes(item)) {
+					t.Errorf("%s: field %d item %d = %q, want %q", name, i, j, got[j], fieldBytes(item))
+				}
+			}
+		}
+		if !c["canonical"].(bool) {
+			continue
+		}
+		b := &Builder{}
+		b.Record(string(fieldBytes(record[0])))
+		for _, f := range record[1:] {
+			if items, isList := f.([]any); isList {
+				strs := make([]string, len(items))
+				for j, item := range items {
+					strs[j] = string(fieldBytes(item))
+				}
+				b.ListField(strs...)
+			} else {
+				b.Field(string(fieldBytes(f)))
+			}
+		}
+		if b.Err() != nil {
+			t.Fatalf("%s: %v", name, b.Err())
+		}
+		if got := hex.EncodeToString(b.Bytes()); got != c["bytes"].(string) {
+			t.Errorf("%s: got %s, want %s", name, got, c["bytes"])
+		}
+		if !Canonical(b.Bytes()) {
+			t.Errorf("%s: builder output is not canonical", name)
+		}
+	}
+}
