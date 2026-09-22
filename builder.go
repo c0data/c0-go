@@ -66,6 +66,100 @@ func (b *Builder) ETB() *Builder {
 	return b
 }
 
+// ETBPayload writes a stream-mode commit marker followed by an integrity
+// payload. The payload may not contain control bytes (it is terminated by the
+// next control code on read); the first such error is recorded and reported
+// by Err, and the payload is not written.
+func (b *Builder) ETBPayload(payload string) *Builder {
+	b.buf = append(b.buf, ETB)
+	for i := 0; i < len(payload); i++ {
+		if payload[i] < 0x20 {
+			if b.err == nil {
+				b.err = fmt.Errorf("c0: ETB payload may not contain control bytes (got 0x%02x)", payload[i])
+			}
+			return b
+		}
+	}
+	b.buf = append(b.buf, payload...)
+	return b
+}
+
+// Nested writes a nested sub-structure: STX, whatever fn writes, ETX.
+func (b *Builder) Nested(fn func(*Builder)) *Builder {
+	b.buf = append(b.buf, STX)
+	fn(b)
+	b.buf = append(b.buf, ETX)
+	return b
+}
+
+// Ref writes a reference to a named group (ENQ + name).
+func (b *Builder) Ref(name string) *Builder {
+	b.buf = append(b.buf, ENQ)
+	b.buf = append(b.buf, name...)
+	return b
+}
+
+// RefPath writes a path reference (group, record id, optional field): ENQ,
+// STX, the segments separated by US, ETX.
+func (b *Builder) RefPath(path ...string) *Builder {
+	b.buf = append(b.buf, ENQ, STX)
+	for i, seg := range path {
+		if i > 0 {
+			b.buf = append(b.buf, US)
+		}
+		b.buf = append(b.buf, seg...)
+	}
+	b.buf = append(b.buf, ETX)
+	return b
+}
+
+// ListField writes a field whose value is a flat list (spec: "arrays are
+// US-separated values inside STX/ETX"): US, STX, the items separated by US
+// (each DLE-escaped), ETX. Read back with Record.List.
+func (b *Builder) ListField(items ...string) *Builder {
+	b.buf = append(b.buf, US, STX)
+	for i, item := range items {
+		if i > 0 {
+			b.buf = append(b.buf, US)
+		}
+		b.writeEscaped(item)
+	}
+	b.buf = append(b.buf, ETX)
+	return b
+}
+
+// Field writes a single field value (US + escaped value), for building a
+// record's fields individually.
+func (b *Builder) Field(value string) *Builder {
+	b.buf = append(b.buf, US)
+	b.writeEscaped(value)
+	return b
+}
+
+// Section writes a document-mode section: GS repeated depth times, then the
+// name.
+func (b *Builder) Section(name string, depth int) *Builder {
+	for i := 0; i < depth; i++ {
+		b.buf = append(b.buf, GS)
+	}
+	b.writeName(name)
+	return b
+}
+
+// Block writes a document-mode content block (RS + escaped text).
+func (b *Builder) Block(text string) *Builder {
+	b.buf = append(b.buf, RS)
+	b.writeEscaped(text)
+	return b
+}
+
+// Item writes a document-mode list item (US + escaped text).
+func (b *Builder) Item(text string) *Builder {
+	b.buf = append(b.buf, US)
+	b.writeEscaped(text)
+	return b
+}
+
 // Bytes returns the built buffer.
 func (b *Builder) Bytes() []byte { return b.buf }
 

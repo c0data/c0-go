@@ -220,5 +220,42 @@ func (r *Record) Values() [][]byte {
 	return vs
 }
 
+// List returns field n as a flat list (see Builder.ListField): the items of
+// its STX/ETX scope, split on top-level US, with escapes decoded. A field that
+// is not a list comes back as a single item; an empty list scope yields an
+// empty slice.
+func (r *Record) List(n int) [][]byte {
+	raw := r.Field(n)
+	if len(raw) == 0 || raw[0] != STX {
+		return [][]byte{Unescape(raw)}
+	}
+	stop := len(raw)
+	if stop > 1 && raw[stop-1] == ETX {
+		stop--
+	}
+	items := [][]byte{}
+	if stop <= 1 {
+		return items
+	}
+	pos := 1
+	itemStart := pos
+	for pos < stop {
+		switch raw[pos] {
+		case US:
+			items = append(items, Unescape(raw[itemStart:pos]))
+			pos++
+			itemStart = pos
+		case DLE:
+			pos += 2
+		case STX:
+			pos = skipNested(raw, pos, stop)
+		default:
+			pos++
+		}
+	}
+	items = append(items, Unescape(raw[itemStart:stop]))
+	return items
+}
+
 // Raw returns the entire record's bytes.
 func (r *Record) Raw() []byte { return r.buf[r.start:r.end] }
