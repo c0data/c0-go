@@ -44,6 +44,26 @@ c0.NewStreamReader(data) // .Torn(), .Committed(), .Block(i)
 c0.Format(buf)           // Unicode Control Pictures
 ```
 
+### List fields
+
+A field whose value is a flat list is written as US-separated items inside
+STX/ETX (`␂Admin␟Editor␃`). `ListField` writes one; `Record.List` reads it
+back as unescaped items.
+
+```go
+buf, _ := c0.Build(func(b *c0.Builder) {
+    b.Group("users", nil)
+    b.Record("Alice")
+    b.ListField("Admin", "Editor")   // one field: ␂Admin␟Editor␃
+})
+rec := c0.NewTable(buf).Record(0)
+roles := rec.List(1)                 // [][]byte{"Admin", "Editor"}
+_ = roles
+```
+
+The builder also has `Field`, `Nested`, `Ref`, `RefPath`, `Section`, `Block`,
+`Item`, and `ETBPayload`, matching the Crystal reference.
+
 ## Status
 
 Core: tokenizer, table/record and document/group readers (zero-copy), builder,
