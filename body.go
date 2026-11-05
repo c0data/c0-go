@@ -125,9 +125,21 @@ func (b *Body) index() {
 		pos = scanLayout(buf, pos+1, b.stop)
 		ns := pos
 		pos = scanPlain(buf, pos, b.stop)
-		f := &FileView{buf: buf, nameStart: ns, nameEnd: pos}
-		pos = b.indexPart(pos, f)
-		if !dead {
+		if dead {
+			// a dead file line is read as if absent: what follows belongs to
+			// the file before it, its leading items to that file's last group
+			if len(b.files) == 0 {
+				b.files = append(b.files, file)
+			}
+			prev := b.files[len(b.files)-1]
+			var cont *Group
+			if len(prev.groups) > 0 {
+				cont = prev.groups[len(prev.groups)-1]
+			}
+			pos = b.indexPartInto(pos, prev, cont)
+		} else {
+			f := &FileView{buf: buf, nameStart: ns, nameEnd: pos}
+			pos = b.indexPart(pos, f)
 			b.files = append(b.files, f)
 		}
 	}
@@ -146,11 +158,18 @@ func (b *Body) deadFS(pos int) bool {
 
 // indexPart indexes one part: leading items (unnamed group), then groups.
 // Returns the position of the next FS (or dead FS), or stop.
-func (b *Body) indexPart(pos int, file *FileView) int {
+func (b *Body) indexPart(pos int, file *FileView) int { return b.indexPartInto(pos, file, nil) }
+
+// indexPartInto is indexPart with the leading items appended to cont (the
+// previous file's last group) when continuing after a dead file line.
+func (b *Body) indexPartInto(pos int, file *FileView, cont *Group) int {
 	buf := b.buf
-	g := &Group{buf: buf}
+	g := cont
+	if g == nil {
+		g = &Group{buf: buf}
+	}
 	pos = b.indexGroupContents(pos, g)
-	if g.header != nil || len(g.records) > 0 {
+	if cont == nil && (g.header != nil || len(g.records) > 0) {
 		file.groups = append(file.groups, g)
 	}
 	current := g
