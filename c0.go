@@ -13,7 +13,7 @@ package c0
 import "fmt"
 
 // Version is the C0DATA revision this package implements.
-const Version = "1.0.0-dev"
+const Version = "0.3.0"
 
 // Assigned C0 control codes (DESIGN.md "Assigned Control Codes").
 const (
