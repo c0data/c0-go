@@ -86,7 +86,8 @@ The builder also has `File`, `GroupAt`/`Section`, `Block`/`Item`, `KeyLevel`,
 ### Primitives
 
 Underneath, the builder has one method per code: `FS`, `GS`, `RS`, `US`,
-`SOH`, `DLE`, `CAN`, `BEL`, `ENQ`, `SYN`, `EOT`, `ETB`, `EM`. Each writes
+`SUB` (C0-DIFF only), `SOH`, `DLE`, `CAN`, `BEL`, `ENQ`, `SYN`, `EOT`, `ETB`,
+`EM`. Each writes
 its code and, when given, what follows it (optional arguments are variadic:
 none or one), so a chain reads like the bytes, and anything the grammar
 allows can be written:
@@ -98,6 +99,7 @@ b.GS("users").SOH().RS("name").US("amount")                 // header row
 b.RS("cfg").US().DLE().RS().SOH("b").US("2").CAN()          // ␞cfg␟␐␞␁b␟2␘
 b.BEL().GS("old")                                           // a dead group
 b.GS().GS("sub").RS().ENQ("users").US().ENQ("users", "1")   // ␝␝sub␞␅users␟␅␂users␟1␃
+b.RS("old").SUB("new")                                      // ␞old␚new  (C0-DIFF replace-all)
 ```
 
 The composed methods above are built on these and cannot write ill-formed

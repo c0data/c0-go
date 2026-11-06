@@ -10,8 +10,8 @@ package c0
 //		b.EOT()
 //	})
 //
-// Two layers. The primitives are one method per code (FS, GS, RS, US, SOH,
-// DLE, CAN, BEL, ENQ, SYN, EOT, ETB, EM); each writes its code and, when
+// Two layers. The primitives are one method per code (FS, GS, RS, US, SUB,
+// SOH, DLE, CAN, BEL, ENQ, SYN, EOT, ETB, EM); each writes its code and, when
 // given, what grammatically follows it, so a chain reads like the bytes:
 //
 //	b.RS("Alice").US("1502.30")                        // ␞Alice␟1502.30
@@ -103,6 +103,19 @@ func (b *Builder) US(value ...string) *Builder {
 		b.buf = AppendValue(b.buf, []byte(v))
 	}
 	b.units++
+	return b
+}
+
+// SUB writes SUB and, when given, the new side of a substitution. C0-DIFF
+// only: RS("old").SUB("new") is a replace-all; GS("x").US("10").SUB("20") a
+// pattern with one substitution. In a data body SUB is an error. It does not
+// change the unit count.
+func (b *Builder) SUB(value ...string) *Builder {
+	v, ok := optional("SUB", value)
+	b.buf = append(b.buf, SUB)
+	if ok {
+		b.buf = AppendValue(b.buf, []byte(v))
+	}
 	return b
 }
 

@@ -486,6 +486,8 @@ func TestBuilderPrimitives(t *testing.T) {
 		{func(b *Builder) { b.GS().GS("sub").RS().ENQ("users").US().ENQ("users", "1") }, "␝␝sub␞␅users␟␅␂users␟1␃"},
 		{func(b *Builder) { b.SYN().SOH("version").US("1").RS("a").EOT() }, "␖␁version␟1␞a␄"},
 		{func(b *Builder) { b.RS("a b").US(" c").ETB("sha").ETB() }, "␞a b␟␂ c␃␗sha␗"},
+		{func(b *Builder) { b.FS("f").RS("old").SUB("new").GS("x").US("10").SUB("20") }, "␜f␞old␚new␝x␟10␚20"},
+		{func(b *Builder) { b.RS("old").SUB(" new").SUB() }, "␞old␚␂ new␃␚"},
 	}
 	for _, c := range cases {
 		got := mustBuild(t, c.fn)
