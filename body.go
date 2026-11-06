@@ -615,6 +615,9 @@ func ParseReference(raw []byte) (ref Reference, err error) {
 			if len(s) == 0 {
 				fail("reference path with an empty segment", p)
 			}
+			if !IsName(s) {
+				fail("reference path segment is not a name", p)
+			}
 		}
 		return Reference{Path: segs}, nil
 	}

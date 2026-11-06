@@ -8,7 +8,7 @@ import (
 // StreamReader scans an append-only log for ETB commits (DESIGN.md "Stream
 // Mode"). An unescaped ETB is always a commit, even inside open text or a
 // level; such a block is damaged and yields nothing. The tail after the
-// last commit is torn unless it holds only layout, notes or EOT. Zero-copy:
+// last commit is torn unless it holds only layout, notes, EOT or an EM region. Zero-copy:
 // accessors return sub-slices of the buffer.
 type StreamReader struct {
 	buf          []byte
@@ -222,6 +222,8 @@ func (s *StreamReader) tornTail() (torn bool) {
 		switch buf[pos] {
 		case EOT:
 			pos++
+		case EM:
+			return false // the raw region is not log data
 		case BEL:
 			p2 := scanLayout(buf, pos+1, n)
 			if p2 < n && buf[p2] < 0x20 && buf[p2] != STX {

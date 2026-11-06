@@ -524,6 +524,9 @@ func (v *Validator) value(pos, stop int, heading bool) int {
 				if len(s) == 0 {
 					fail("reference path with an empty segment", start)
 				}
+				if !IsName(s) {
+					fail("reference path segment is not a name", start)
+				}
 			}
 			if len(segs) > 3 {
 				fail("reference path with more than three segments", start)
