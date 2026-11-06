@@ -107,6 +107,8 @@ const (
 	ErrNotReference c0Error = "unit is not a reference"
 	ErrNotName      c0Error = "not a legal name"
 	ErrNoGroup      c0Error = "no such group"
+	ErrNoLevel      c0Error = "CAN with no open level"
+	ErrEmptyNote    c0Error = "a note needs content: bare BEL marks the next element dead"
 )
 
 // scanPanic carries a scan error up to the nearest catch.

@@ -81,7 +81,30 @@ _, _, _, _ = host, roles, addr, ref
 ```
 
 The builder also has `File`, `GroupAt`/`Section`, `Block`/`Item`, `KeyLevel`,
-`HeadingLevel` (the `blob` table), `Note`, `ETB`/`ETBPayload` and `EM`.
+`HeadingLevel` (the `blob` table), `Note`, `ETB` and `EM`.
+
+### Primitives
+
+Underneath, the builder has one method per code: `FS`, `GS`, `RS`, `US`,
+`SOH`, `DLE`, `CAN`, `BEL`, `ENQ`, `SYN`, `EOT`, `ETB`, `EM`. Each writes
+its code and, when given, what follows it (optional arguments are variadic:
+none or one), so a chain reads like the bytes, and anything the grammar
+allows can be written:
+
+```go
+b.RS("Alice").US("1502.30")                                 // ␞Alice␟1502.30
+b.RS().SOH("host").US("localhost").SOH("port").US("5432")   // ␞␁host␟localhost␁port␟5432
+b.GS("users").SOH().RS("name").US("amount")                 // header row
+b.RS("cfg").US().DLE().RS().SOH("b").US("2").CAN()          // ␞cfg␟␐␞␁b␟2␘
+b.BEL().GS("old")                                           // a dead group
+b.GS().GS("sub").RS().ENQ("users").US().ENQ("users", "1")   // ␝␝sub␞␅users␟␅␂users␟1␃
+```
+
+The composed methods above are built on these and cannot write ill-formed
+output; with the primitives, well-formedness is yours. Values still take
+their one spelling and names are still checked, so what is written stays
+canonical. The two layers share state and mix freely: `b.GS("g").Key("k", "v")`
+writes `␝g␞␁k␟v`.
 
 ### Streams
 

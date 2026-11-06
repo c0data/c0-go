@@ -471,3 +471,99 @@ func TestPrettyParseLayout(t *testing.T) {
 		t.Errorf("parse = %q, want %q", got, want)
 	}
 }
+
+func TestBuilderPrimitives(t *testing.T) {
+	cases := []struct {
+		fn   func(*Builder)
+		want string
+	}{
+		{func(b *Builder) { b.FS("inv").GS("users").SOH().RS("name").US("amount") }, "␜inv␝users␁␞name␟amount"},
+		{func(b *Builder) { b.RS("Alice").US("1502.30") }, "␞Alice␟1502.30"},
+		{func(b *Builder) { b.RS().SOH("host").US("localhost").SOH("port").US("5432") }, "␞␁host␟localhost␁port␟5432"},
+		{func(b *Builder) { b.RS("cfg").US().DLE().RS().SOH("b").US("2").CAN() }, "␞cfg␟␐␞␁b␟2␘"},
+		{func(b *Builder) { b.BEL("checked").RS("x") }, "␇checked␞x"},
+		{func(b *Builder) { b.BEL().GS("old").RS("1").GS("new").RS("2") }, "␇␝old␞1␝new␞2"},
+		{func(b *Builder) { b.GS().GS("sub").RS().ENQ("users").US().ENQ("users", "1") }, "␝␝sub␞␅users␟␅␂users␟1␃"},
+		{func(b *Builder) { b.SYN().SOH("version").US("1").RS("a").EOT() }, "␖␁version␟1␞a␄"},
+		{func(b *Builder) { b.RS("a b").US(" c").ETB("sha").ETB() }, "␞a b␟␂ c␃␗sha␗"},
+	}
+	for _, c := range cases {
+		got := mustBuild(t, c.fn)
+		if want := Parse(c.want); !bytes.Equal(got, want) {
+			t.Errorf("primitives = %q\nwant         %q", got, want)
+		}
+	}
+	if got := mustBuild(t, func(b *Builder) { b.RS("a").EM([]byte("raw")) }); string(got) != "\x1ea\x19raw" {
+		t.Errorf("EM = %q", got)
+	}
+
+	// Mixing with the composed methods: both layers share the record state.
+	mixed := mustBuild(t, func(b *Builder) {
+		b.RS("a")
+		b.Field("b")
+		b.Record()
+		b.US("c")
+		b.GS("g")
+		b.Key("k", "v")
+		b.Group("h", []string{"h"})
+		b.Field("x")
+	})
+	if want := Parse("␞a␟b␞␟c␝g␞␁k␟v␝h␁␞h␞x"); !bytes.Equal(mixed, want) {
+		t.Errorf("mixed = %q\nwant    %q", mixed, want)
+	}
+
+	// Errors are recorded, not written.
+	if _, err := Build(func(b *Builder) { b.CAN() }); !errors.Is(err, ErrNoLevel) {
+		t.Errorf("CAN with no level: %v", err)
+	}
+	for _, fn := range []func(*Builder){
+		func(b *Builder) { b.Record("a").Note("") },
+		func(b *Builder) { b.Record("a").BEL("") },
+	} {
+		if _, err := Build(fn); !errors.Is(err, ErrEmptyNote) {
+			t.Errorf("empty note: %v", err)
+		}
+	}
+	for _, fn := range []func(*Builder){
+		func(b *Builder) { b.FS("a\x1cb") },
+		func(b *Builder) { b.GS(" g") },
+		func(b *Builder) { b.SOH("k\n") },
+		func(b *Builder) { b.ENQ("bad\x1e") },
+		func(b *Builder) { b.ENQ() },
+		func(b *Builder) { b.ETB("x y\t") },
+	} {
+		if _, err := Build(fn); !errors.Is(err, ErrNotName) {
+			t.Errorf("bad name accepted: %v", err)
+		}
+	}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("RS with two arguments did not panic")
+			}
+		}()
+		Build(func(b *Builder) { b.RS("a", "b") })
+	}()
+
+	// The same document through either layer is byte-identical.
+	hi := mustBuild(t, func(b *Builder) {
+		b.SYN().Heading("shape", "tabular")
+		b.Group("users", []string{"name", "amount"})
+		b.Record("Alice", "1502.30")
+		b.Record("Bob", "3 40")
+		b.Group("cfg", nil)
+		b.Record().Key("host", "localhost").Key("port", "5432")
+		b.EOT()
+	})
+	lo := mustBuild(t, func(b *Builder) {
+		b.SYN().SOH("shape").US("tabular")
+		b.GS("users").SOH().RS("name").US("amount").RS("Alice").US("1502.30").RS("Bob").US("3 40")
+		b.GS("cfg").RS().SOH("host").US("localhost").SOH("port").US("5432").EOT()
+	})
+	if !bytes.Equal(lo, hi) {
+		t.Errorf("layers differ:\n%q\n%q", lo, hi)
+	}
+	if !IsCanonical(mustParse(t, lo).Body().Raw()) {
+		t.Error("primitive-built document is not canonical")
+	}
+}
